@@ -57,6 +57,8 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/h2-console/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/oauth2/**", "/login/**").permitAll()
+                   .requestMatchers(HttpMethod.OPTIONS, "/api/**").permitAll()
+                    .requestMatchers("/api/riders/**").permitAll()  
                 .requestMatchers("/api/vendor/**").hasRole("VENDOR")
                 .requestMatchers("/api/auth/**").authenticated()
                 .anyRequest().authenticated()
