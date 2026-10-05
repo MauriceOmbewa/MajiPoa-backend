@@ -1,0 +1,1434 @@
+{
+  "info": {
+    "name": "MajiPoa API",
+    "description": "Complete API collection for the MajiPoa water-delivery platform backend.\n\n## Authentication\nThis API uses **Google OAuth2 / OIDC** with server-side sessions (cookies). There is no token endpoint to call directly.\n\n### Sign-in flow\n1. Open `GET /oauth2/authorization/google` in a **browser** — this redirects you to Google's sign-in page.\n2. Sign in with Google. Spring Security processes the callback and sets a `JSESSIONID` session cookie.\n3. The browser is redirected to `http://localhost:4200/auth/callback` — the Angular frontend.\n4. The frontend (or Postman, if you copy the cookie) calls `GET /api/auth/me` to retrieve the user profile.\n\n### Using with Postman\n- Enable **\"Automatically follow redirects\"** and **\"Send cookies\"** in Postman settings.\n- Open the browser-based sign-in via the OAuth2 initiation request in the `🔐 OAuth2 Flow` folder.\n- Copy the resulting `JSESSIONID` cookie into the `session_cookie` collection variable, **or** use Postman's cookie manager to let it pass automatically.\n\n## Variables\n| Variable | Default | Description |\n|---|---|---|\n| `base_url` | `http://localhost:8080` | Backend base URL |\n| `order_ref` | `WM10262` | Sample order reference |\n| `product_id` | `1` | Sample product ID |\n| `sale_id` | `1` | Sample offline sale ID |",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "majipoa-api-collection-v1"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "order_ref",
+      "value": "WM10262",
+      "type": "string"
+    },
+    {
+      "key": "product_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "sale_id",
+      "value": "1",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "🔐 OAuth2 Flow",
+      "description": "Google OAuth2 sign-in flow endpoints. These are managed by Spring Security and must be opened in a browser to work correctly — they involve browser redirects to Google.",
+      "item": [
+        {
+          "name": "Initiate Google Sign-In",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/oauth2/authorization/google",
+              "host": ["{{base_url}}"],
+              "path": ["oauth2", "authorization", "google"]
+            },
+            "description": "Opens the Google OAuth2 sign-in flow.\n\n⚠️ **Open this in a browser**, not Postman — it redirects to Google's sign-in page.\n\nAfter a successful sign-in:\n- Spring Security creates a server-side session\n- Sets a `JSESSIONID` cookie in the browser\n- Redirects to `http://localhost:4200/auth/callback`\n\nCopy the `JSESSIONID` cookie value into the `session_cookie` collection variable to authenticate Postman requests."
+          },
+          "response": []
+        },
+        {
+          "name": "OAuth2 Callback (Google → Spring)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/login/oauth2/code/google?code=GOOGLE_AUTH_CODE&state=STATE",
+              "host": ["{{base_url}}"],
+              "path": ["login", "oauth2", "code", "google"],
+              "query": [
+                {
+                  "key": "code",
+                  "value": "GOOGLE_AUTH_CODE",
+                  "description": "Authorization code returned by Google (automatically populated during real flow)"
+                },
+                {
+                  "key": "state",
+                  "value": "STATE",
+                  "description": "CSRF state token (automatically populated during real flow)"
+                }
+              ]
+            },
+            "description": "The OAuth2 callback URL that Google redirects to after successful sign-in.\n\n⚠️ This is handled automatically by Spring Security during the real OAuth2 flow — you do not call this endpoint directly. It is listed here for documentation purposes only."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "👤 Auth",
+      "description": "Session management and role-switching endpoints. All require an authenticated session (Google OAuth2 cookie).",
+      "item": [
+        {
+          "name": "Get Current User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has user fields', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('id');",
+                  "    pm.expect(json).to.have.property('email');",
+                  "    pm.expect(json).to.have.property('role');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/auth/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "me"]
+            },
+            "description": "Returns the currently authenticated user's profile.\n\nCalled by the Angular frontend after the OAuth2 callback to restore session state and determine which role-based view to show.\n\n**Response fields:**\n| Field | Type | Description |\n|---|---|---|\n| `id` | Long | Internal DB user ID |\n| `email` | String | Google account email |\n| `name` | String | Display name from Google |\n| `pictureUrl` | String | Google profile picture URL |\n| `role` | String | `CUSTOMER` \\| `VENDOR` \\| `RIDER` \\| `ADMIN` |"
+          },
+          "response": [
+            {
+              "name": "200 OK — Customer",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/auth/me",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "auth", "me"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": 1,\n  \"email\": \"jane.doe@gmail.com\",\n  \"name\": \"Jane Doe\",\n  \"pictureUrl\": \"https://lh3.googleusercontent.com/a/example\",\n  \"role\": \"CUSTOMER\"\n}"
+            },
+            {
+              "name": "200 OK — Vendor",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/auth/me",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "auth", "me"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": 2,\n  \"email\": \"vendor@example.com\",\n  \"name\": \"Peter Kamau\",\n  \"pictureUrl\": \"https://lh3.googleusercontent.com/a/vendor\",\n  \"role\": \"VENDOR\"\n}"
+            },
+            {
+              "name": "401 Unauthorized",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/auth/me",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "auth", "me"]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "text",
+              "header": [],
+              "body": ""
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 204', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "logout"]
+            },
+            "description": "Ends the server-side session.\n\nInvalidates the current `JSESSIONID` cookie. All subsequent requests will return `401 Unauthorized` until the user signs in again via Google OAuth2.\n\n**Response:** `204 No Content`"
+          },
+          "response": [
+            {
+              "name": "204 No Content",
+              "originalRequest": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{base_url}}/api/auth/logout",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "auth", "logout"]
+                }
+              },
+              "status": "No Content",
+              "code": 204,
+              "_postman_previewlanguage": "text",
+              "header": [],
+              "body": ""
+            }
+          ]
+        },
+        {
+          "name": "Switch Role",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Role was updated', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('role');",
+                  "    pm.expect(['VENDOR', 'RIDER']).to.include(json.role);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"VENDOR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/role",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "role"]
+            },
+            "description": "Permanently upgrades the authenticated user's role.\n\nCalled when the user accepts the \"Join as vendor\" or \"Become a rider\" confirmation screen. This is a **one-way operation** — once set to VENDOR, the user cannot be demoted via API.\n\n**Allowed role values:** `VENDOR`, `RIDER`\n\n**Body:**\n```json\n{ \"role\": \"VENDOR\" }\n```\n\n**Response:** `UserResponse` with updated role."
+          },
+          "response": [
+            {
+              "name": "200 OK — Upgraded to VENDOR",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"role\": \"VENDOR\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/auth/role",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "auth", "role"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": 1,\n  \"email\": \"jane.doe@gmail.com\",\n  \"name\": \"Jane Doe\",\n  \"pictureUrl\": \"https://lh3.googleusercontent.com/a/example\",\n  \"role\": \"VENDOR\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "🏪 Vendor — Dashboard",
+      "description": "Vendor portal dashboard endpoint. Requires `ROLE_VENDOR`.",
+      "item": [
+        {
+          "name": "Get Dashboard",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has dashboard fields', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('salesToday');",
+                  "    pm.expect(json).to.have.property('ordersToday');",
+                  "    pm.expect(json).to.have.property('jugsInStock');",
+                  "    pm.expect(json).to.have.property('incoming');",
+                  "    pm.expect(json).to.have.property('active');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/dashboard",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "dashboard"]
+            },
+            "description": "Returns the vendor's dashboard summary: today's sales totals, incoming orders, active deliveries, and stock levels."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/vendor/dashboard",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "vendor", "dashboard"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"salesToday\": 14500,\n  \"ordersToday\": 12,\n  \"completedToday\": 8,\n  \"jugsInStock\": 45,\n  \"jugsCapacity\": 100,\n  \"incoming\": [\n    {\n      \"id\": 101,\n      \"orderRef\": \"#WM10262\",\n      \"items\": \"20L x2, 500ml x3\",\n      \"area\": \"Westlands\",\n      \"distanceKm\": 2.4,\n      \"total\": 1200,\n      \"minutesAgo\": 5\n    }\n  ],\n  \"active\": [\n    {\n      \"id\": 100,\n      \"orderRef\": \"#WM10261\",\n      \"items\": \"20L x1\",\n      \"area\": \"Kilimani\",\n      \"stage\": \"On the way\"\n    }\n  ]\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "📦 Vendor — Orders",
+      "description": "Order management endpoints. Covers the full order lifecycle: NEW → PREPARING → READY → OUT_FOR_DELIVERY → COMPLETED.\n\nAll require `ROLE_VENDOR`.",
+      "item": [
+        {
+          "name": "List Orders",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is an array', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/orders",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "orders"]
+            },
+            "description": "Returns all orders belonging to the authenticated vendor.\n\n**Order status values:** `NEW` | `PREPARING` | `READY` | `OUT_FOR_DELIVERY` | `COMPLETED` | `CANCELLED`\n\n**Payment status values:** `PAID` | `INVOICED` | `REFUNDED`"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/vendor/orders",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "vendor", "orders"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "[\n  {\n    \"id\": 101,\n    \"orderRef\": \"#WM10262\",\n    \"customerName\": \"John Mwangi\",\n    \"area\": \"Westlands\",\n    \"distanceKm\": 2.4,\n    \"status\": \"NEW\",\n    \"paymentStatus\": \"PAID\",\n    \"total\": 1200,\n    \"placedAgo\": \"5 minutes ago\",\n    \"riderName\": null,\n    \"riderKind\": null,\n    \"deliveryStage\": null,\n    \"placedAt\": \"2026-10-05T08:25:00Z\",\n    \"lines\": [\n      { \"productName\": \"20L Refill\", \"note\": null, \"qty\": 2, \"unitPrice\": 500 },\n      { \"productName\": \"500ml Bottle\", \"note\": \"Cold\", \"qty\": 3, \"unitPrice\": 67 }\n    ]\n  }\n]"
+            }
+          ]
+        },
+        {
+          "name": "Get Order by Ref",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Order ref matches', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('orderRef');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/orders/{{order_ref}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "orders", "{{order_ref}}"]
+            },
+            "description": "Returns a single order by its reference string (e.g. `WM10262` or `#WM10262`).\n\nSet the `order_ref` collection variable to test with a real order."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/vendor/orders/WM10262",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "vendor", "orders", "WM10262"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": 101,\n  \"orderRef\": \"#WM10262\",\n  \"customerName\": \"John Mwangi\",\n  \"area\": \"Westlands\",\n  \"distanceKm\": 2.4,\n  \"status\": \"NEW\",\n  \"paymentStatus\": \"PAID\",\n  \"total\": 1200,\n  \"placedAgo\": \"5 minutes ago\",\n  \"riderName\": null,\n  \"riderKind\": null,\n  \"deliveryStage\": null,\n  \"placedAt\": \"2026-10-05T08:25:00Z\",\n  \"lines\": [\n    { \"productName\": \"20L Refill\", \"note\": null, \"qty\": 2, \"unitPrice\": 500 }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Accept Order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Order status is PREPARING', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.status).to.equal('PREPARING');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/orders/{{order_ref}}/accept",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "orders", "{{order_ref}}", "accept"]
+            },
+            "description": "Accepts a `NEW` order, transitioning it to `PREPARING`.\n\n**Lifecycle:** `NEW → PREPARING`"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{base_url}}/api/vendor/orders/WM10262/accept",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "vendor", "orders", "WM10262", "accept"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": 101,\n  \"orderRef\": \"#WM10262\",\n  \"status\": \"PREPARING\",\n  \"paymentStatus\": \"PAID\",\n  \"customerName\": \"John Mwangi\",\n  \"area\": \"Westlands\",\n  \"distanceKm\": 2.4,\n  \"total\": 1200\n}"
+            }
+          ]
+        },
+        {
+          "name": "Decline Order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Order status is CANCELLED', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.status).to.equal('CANCELLED');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/orders/{{order_ref}}/decline",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "orders", "{{order_ref}}", "decline"]
+            },
+            "description": "Declines an order, transitioning it to `CANCELLED`.\n\n**Lifecycle:** `NEW → CANCELLED`"
+          },
+          "response": []
+        },
+        {
+          "name": "Mark Order Ready",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Order status is READY', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.status).to.equal('READY');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/orders/{{order_ref}}/ready",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "orders", "{{order_ref}}", "ready"]
+            },
+            "description": "Marks a `PREPARING` order as ready for pickup.\n\n**Lifecycle:** `PREPARING → READY`"
+          },
+          "response": []
+        },
+        {
+          "name": "Assign Rider",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Order status is OUT_FOR_DELIVERY', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.status).to.equal('OUT_FOR_DELIVERY');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"riderName\": \"Peter Omondi\",\n  \"riderKind\": \"PLATFORM\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/vendor/orders/{{order_ref}}/assign-rider",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "orders", "{{order_ref}}", "assign-rider"]
+            },
+            "description": "Assigns a rider to a `READY` order, transitioning it to `OUT_FOR_DELIVERY`.\n\n**Lifecycle:** `READY → OUT_FOR_DELIVERY`\n\n**Body fields:**\n| Field | Required | Values |\n|---|---|---|\n| `riderName` | ✅ | Rider's name |\n| `riderKind` | ✅ | `PLATFORM` or `MY_STAFF` |"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"riderName\": \"Peter Omondi\",\n  \"riderKind\": \"PLATFORM\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/vendor/orders/WM10262/assign-rider",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "vendor", "orders", "WM10262", "assign-rider"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": 101,\n  \"orderRef\": \"#WM10262\",\n  \"status\": \"OUT_FOR_DELIVERY\",\n  \"riderName\": \"Peter Omondi\",\n  \"riderKind\": \"PLATFORM\",\n  \"deliveryStage\": \"EN_ROUTE\",\n  \"paymentStatus\": \"PAID\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Mark Delivered",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Order status is COMPLETED', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.status).to.equal('COMPLETED');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/orders/{{order_ref}}/deliver",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "orders", "{{order_ref}}", "deliver"]
+            },
+            "description": "Marks an `OUT_FOR_DELIVERY` order as delivered and completed.\n\n**Lifecycle:** `OUT_FOR_DELIVERY → COMPLETED`"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🧴 Vendor — Products",
+      "description": "Product catalogue and inventory management. All require `ROLE_VENDOR`.",
+      "item": [
+        {
+          "name": "List Products",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is an array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/products",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "products"]
+            },
+            "description": "Returns all products in the vendor's catalogue.\n\n**Product status values:** `SELLING` | `PAUSED` | `OUT_OF_STOCK`"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/vendor/products",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "vendor", "products"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "[\n  {\n    \"id\": 1,\n    \"name\": \"20L Refill\",\n    \"note\": \"Clean spring water, UV treated\",\n    \"size\": \"20L\",\n    \"price\": 500,\n    \"marketMin\": 450,\n    \"marketMax\": 600,\n    \"availableToday\": 45,\n    \"soldToday\": 12,\n    \"status\": \"SELLING\"\n  },\n  {\n    \"id\": 2,\n    \"name\": \"500ml Bottle\",\n    \"note\": null,\n    \"size\": \"500ml\",\n    \"price\": 67,\n    \"marketMin\": 50,\n    \"marketMax\": 80,\n    \"availableToday\": 200,\n    \"soldToday\": 30,\n    \"status\": \"SELLING\"\n  }\n]"
+            }
+          ]
+        },
+        {
+          "name": "Update Stock",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has updated stock', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('availableToday');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"delta\": 10\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/vendor/products/{{product_id}}/stock",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "products", "{{product_id}}", "stock"]
+            },
+            "description": "Adjusts the stock level for a product.\n\n**Body:**\n| Field | Description |\n|---|---|\n| `delta` | Positive integer to add stock, negative to reduce |\n\n**Examples:**\n- Add 10 jugs: `{ \"delta\": 10 }`\n- Remove 5 jugs: `{ \"delta\": -5 }`"
+          },
+          "response": [
+            {
+              "name": "200 OK — Stock Added",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"delta\": 10\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/vendor/products/1/stock",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "vendor", "products", "1", "stock"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": 1,\n  \"name\": \"20L Refill\",\n  \"availableToday\": 55,\n  \"soldToday\": 12,\n  \"status\": \"SELLING\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Price",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has updated price', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('price');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": 550\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/vendor/products/{{product_id}}/price",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "products", "{{product_id}}", "price"]
+            },
+            "description": "Updates the selling price for a product.\n\n**Body:**\n| Field | Type | Constraint |\n|---|---|---|\n| `price` | int | `@Min(0)` — must be ≥ 0 |"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"price\": 550\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/vendor/products/1/price",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "vendor", "products", "1", "price"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": 1,\n  \"name\": \"20L Refill\",\n  \"price\": 550,\n  \"marketMin\": 450,\n  \"marketMax\": 600,\n  \"status\": \"SELLING\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Toggle Pause Product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Status is SELLING or PAUSED', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(['SELLING', 'PAUSED']).to.include(json.status);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/products/{{product_id}}/toggle-pause",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "products", "{{product_id}}", "toggle-pause"]
+            },
+            "description": "Toggles a product's availability on/off.\n\n- `SELLING` → `PAUSED`\n- `PAUSED` → `SELLING`\n\nPaused products do not appear to customers in the marketplace."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📊 Vendor — Analytics",
+      "description": "Sales analytics and performance metrics. Requires `ROLE_VENDOR`.",
+      "item": [
+        {
+          "name": "Get Analytics",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has analytics fields', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('grossSales');",
+                  "    pm.expect(json).to.have.property('orders');",
+                  "    pm.expect(json).to.have.property('topProducts');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/analytics?period=Last 30 days",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "analytics"],
+              "query": [
+                {
+                  "key": "period",
+                  "value": "Last 30 days",
+                  "description": "Time range. Options: \"Last 7 days\", \"Last 30 days\", \"Last 90 days\". Defaults to \"Last 30 days\"."
+                }
+              ]
+            },
+            "description": "Returns sales analytics for the given time period.\n\n**Query param `period` options:**\n- `Last 7 days`\n- `Last 30 days` *(default)*\n- `Last 90 days`"
+          },
+          "response": [
+            {
+              "name": "200 OK — Last 30 days",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/vendor/analytics?period=Last 30 days",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "vendor", "analytics"],
+                  "query": [{ "key": "period", "value": "Last 30 days" }]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"period\": \"Last 30 days\",\n  \"grossSales\": 250000,\n  \"netAfterFees\": 230000,\n  \"commissionPaid\": 20000,\n  \"orders\": 200,\n  \"avgOrder\": 1250,\n  \"salesByDay\": [\n    { \"day\": \"Mon\", \"pct\": 75, \"peak\": false },\n    { \"day\": \"Tue\", \"pct\": 60, \"peak\": false },\n    { \"day\": \"Wed\", \"pct\": 80, \"peak\": false },\n    { \"day\": \"Thu\", \"pct\": 90, \"peak\": true },\n    { \"day\": \"Fri\", \"pct\": 100, \"peak\": true },\n    { \"day\": \"Sat\", \"pct\": 85, \"peak\": false },\n    { \"day\": \"Sun\", \"pct\": 50, \"peak\": false }\n  ],\n  \"busiestHours\": [\n    { \"label\": \"7am\", \"pct\": 60, \"orders\": 30 },\n    { \"label\": \"8am\", \"pct\": 85, \"orders\": 50 },\n    { \"label\": \"12pm\", \"pct\": 70, \"orders\": 40 }\n  ],\n  \"topProducts\": [\n    { \"label\": \"20L Refill\", \"pct\": 60, \"value\": \"KES 150,000\" },\n    { \"label\": \"500ml Bottle\", \"pct\": 40, \"value\": \"KES 100,000\" }\n  ],\n  \"areas\": [\n    { \"label\": \"Westlands\", \"pct\": 40, \"value\": \"KES 100,000\" },\n    { \"label\": \"Kilimani\", \"pct\": 35, \"value\": \"KES 87,500\" }\n  ],\n  \"newCustomers\": 50,\n  \"returningCustomers\": 150,\n  \"repeatRate\": 75,\n  \"recurringCustomers\": 120,\n  \"lostCustomers\": 10,\n  \"acceptanceRate\": 95,\n  \"avgPrepTime\": 15,\n  \"avgDeliveryTime\": 35,\n  \"cancellationRate\": 0.03\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "🧾 Vendor — Offline Sales",
+      "description": "Record and manage sales made outside the platform (walk-ins, standing clients, other apps). Available on PRO plan. Requires `ROLE_VENDOR`.",
+      "item": [
+        {
+          "name": "List Offline Sales",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is an array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/offline-sales",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "offline-sales"]
+            },
+            "description": "Returns all offline sales recorded by the vendor.\n\n**Note:** Only available on the PRO subscription plan."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/vendor/offline-sales",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "vendor", "offline-sales"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "[\n  {\n    \"id\": 1,\n    \"saleDate\": \"2026-10-04\",\n    \"product\": \"20L Refill\",\n    \"qty\": 5,\n    \"amount\": 2500,\n    \"channel\": \"Walk-in customer\"\n  },\n  {\n    \"id\": 2,\n    \"saleDate\": \"2026-10-03\",\n    \"product\": \"20L Refill\",\n    \"qty\": 20,\n    \"amount\": 10000,\n    \"channel\": \"Standing office client\"\n  }\n]"
+            }
+          ]
+        },
+        {
+          "name": "Create Offline Sale",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response has sale id', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('id');",
+                  "    // Save for deletion test",
+                  "    pm.collectionVariables.set('sale_id', json.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"saleDate\": \"2026-10-05\",\n  \"product\": \"20L Refill\",\n  \"qty\": 5,\n  \"amount\": 2500,\n  \"channel\": \"Walk-in customer\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/vendor/offline-sales",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "offline-sales"]
+            },
+            "description": "Records a new offline sale.\n\n**Body fields:**\n| Field | Required | Type | Constraint |\n|---|---|---|---|\n| `saleDate` | ✅ | String (ISO date) | `YYYY-MM-DD` |\n| `product` | ✅ | String | Not blank |\n| `qty` | ✅ | int | `@Min(1)` |\n| `amount` | ✅ | int | `@Min(1)` — total KES amount |\n| `channel` | ✅ | String | e.g. `Walk-in customer`, `Standing office client`, `Another delivery app` |\n\n**Response:** `201 Created`"
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"saleDate\": \"2026-10-05\",\n  \"product\": \"20L Refill\",\n  \"qty\": 5,\n  \"amount\": 2500,\n  \"channel\": \"Walk-in customer\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/vendor/offline-sales",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "vendor", "offline-sales"]
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": 3,\n  \"saleDate\": \"2026-10-05\",\n  \"product\": \"20L Refill\",\n  \"qty\": 5,\n  \"amount\": 2500,\n  \"channel\": \"Walk-in customer\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Delete Offline Sale",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 204', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/offline-sales/{{sale_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "offline-sales", "{{sale_id}}"]
+            },
+            "description": "Deletes an offline sale record by ID.\n\n**Response:** `204 No Content`"
+          },
+          "response": [
+            {
+              "name": "204 No Content",
+              "originalRequest": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{base_url}}/api/vendor/offline-sales/1",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "vendor", "offline-sales", "1"]
+                }
+              },
+              "status": "No Content",
+              "code": 204,
+              "_postman_previewlanguage": "text",
+              "header": [],
+              "body": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "💰 Vendor — Payouts",
+      "description": "Payout summary and history. Requires `ROLE_VENDOR`.",
+      "item": [
+        {
+          "name": "Get Payouts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has payout fields', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('nextPayout');",
+                  "    pm.expect(json).to.have.property('history');",
+                  "    pm.expect(json.history).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/payouts",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "payouts"]
+            },
+            "description": "Returns the vendor's payout summary including the upcoming payout amount, amounts in clearance, this month's total, dispute holds, a settlement breakdown, and the full payout history."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/vendor/payouts",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "vendor", "payouts"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"nextPayout\": 45000,\n  \"pendingClearance\": 12000,\n  \"paidThisMonth\": 230000,\n  \"heldForDisputes\": 2000,\n  \"settlement\": [\n    { \"label\": \"Gross sales\", \"amount\": 50000 },\n    { \"label\": \"Commission (8%)\", \"amount\": -4000 },\n    { \"label\": \"Delivery fees\", \"amount\": -1000 }\n  ],\n  \"payable\": 45000,\n  \"history\": [\n    {\n      \"id\": 1,\n      \"paidOn\": \"2026-09-28\",\n      \"periodStart\": \"2026-09-21\",\n      \"periodEnd\": \"2026-09-27\",\n      \"orders\": 45,\n      \"gross\": 56250,\n      \"deductions\": 5625,\n      \"paid\": 50625,\n      \"reference\": \"SJ11P0K4TR\"\n    }\n  ]\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "✅ Vendor — Verification",
+      "description": "Business profile and verification document management. Requires `ROLE_VENDOR`.",
+      "item": [
+        {
+          "name": "Get Verification Status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has verification fields', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('verificationStatus');",
+                  "    pm.expect(json).to.have.property('plan');",
+                  "    pm.expect(json).to.have.property('documents');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/verification",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "verification"]
+            },
+            "description": "Returns the vendor's business profile, verification status, subscription plan, and submitted documents.\n\n**verificationStatus values:** `PENDING` | `APPROVED` | `SUSPENDED`\n\n**plan values:** `FREE` | `PRO`\n\n**Document status values:** `APPROVED` | `EXPIRING` | `NOT_SUBMITTED`"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/vendor/verification",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "vendor", "verification"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"businessName\": \"Clear Waters Ltd\",\n  \"waterSource\": \"Borehole\",\n  \"treatment\": \"UV + RO\",\n  \"phValue\": \"7.2\",\n  \"tdsValue\": \"120 ppm\",\n  \"about\": \"Premium water supplier in Nairobi\",\n  \"verificationStatus\": \"PENDING\",\n  \"plan\": \"FREE\",\n  \"documents\": [\n    {\n      \"id\": 1,\n      \"name\": \"Business Registration\",\n      \"note\": \"Certificate of incorporation\",\n      \"reference\": \"BN/12345\",\n      \"submittedOn\": \"2026-01-15\",\n      \"validUntil\": \"2027-01-15\",\n      \"status\": \"APPROVED\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"Water Quality Certificate\",\n      \"note\": null,\n      \"reference\": null,\n      \"submittedOn\": null,\n      \"validUntil\": null,\n      \"status\": \"NOT_SUBMITTED\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Business Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Business name was updated', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('businessName');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"businessName\": \"Clear Waters Ltd\",\n  \"waterSource\": \"Borehole\",\n  \"treatment\": \"UV + RO + Mineralization\",\n  \"phValue\": \"7.2\",\n  \"tdsValue\": \"120 ppm\",\n  \"about\": \"Premium water supplier in Nairobi since 2015\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/vendor/verification/profile",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "verification", "profile"]
+            },
+            "description": "Updates the vendor's business profile information.\n\n**Body fields:**\n| Field | Required | Description |\n|---|---|---|\n| `businessName` | ✅ | Trading name of the business |\n| `waterSource` | ❌ | Source of water (e.g. Borehole, Spring) |\n| `treatment` | ❌ | Treatment process (e.g. UV + RO) |\n| `phValue` | ❌ | pH value of the water |\n| `tdsValue` | ❌ | TDS level (e.g. `120 ppm`) |\n| `about` | ❌ | Short business description |"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"businessName\": \"Clear Waters Ltd\",\n  \"waterSource\": \"Borehole\",\n  \"treatment\": \"UV + RO + Mineralization\",\n  \"phValue\": \"7.2\",\n  \"tdsValue\": \"120 ppm\",\n  \"about\": \"Premium water supplier in Nairobi since 2015\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/vendor/verification/profile",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "vendor", "verification", "profile"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"businessName\": \"Clear Waters Ltd\",\n  \"waterSource\": \"Borehole\",\n  \"treatment\": \"UV + RO + Mineralization\",\n  \"phValue\": \"7.2\",\n  \"tdsValue\": \"120 ppm\",\n  \"about\": \"Premium water supplier in Nairobi since 2015\",\n  \"verificationStatus\": \"PENDING\",\n  \"plan\": \"FREE\",\n  \"documents\": []\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "⭐ Vendor — Subscription",
+      "description": "Subscription plan management. Requires `ROLE_VENDOR`.",
+      "item": [
+        {
+          "name": "Get Subscription",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has plan field', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('plan');",
+                  "    pm.expect(['FREE', 'PRO']).to.include(json.plan);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/subscription",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "subscription"]
+            },
+            "description": "Returns the vendor's current subscription plan.\n\n**Plan values:** `FREE` | `PRO`"
+          },
+          "response": [
+            {
+              "name": "200 OK — FREE plan",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/vendor/subscription",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "vendor", "subscription"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"plan\": \"FREE\"\n}"
+            },
+            {
+              "name": "200 OK — PRO plan",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/vendor/subscription",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "vendor", "subscription"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"plan\": \"PRO\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Upgrade to PRO",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Plan is PRO after upgrade', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.plan).to.equal('PRO');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/subscription/upgrade",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "subscription", "upgrade"]
+            },
+            "description": "Upgrades the vendor's subscription from `FREE` to `PRO`.\n\nUnlocks additional features including:\n- Offline sales tracking\n- Extended analytics\n\n**Response:** `SubscriptionResponse` with `plan: \"PRO\"`"
+          },
+          "response": [
+            {
+              "name": "200 OK — Upgraded to PRO",
+              "originalRequest": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{base_url}}/api/vendor/subscription/upgrade",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "vendor", "subscription", "upgrade"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"plan\": \"PRO\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "🛠️ Dev Tools",
+      "description": "Development and debugging utilities. These are not part of the application API but are useful during development.",
+      "item": [
+        {
+          "name": "H2 Console",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/h2-console",
+              "host": ["{{base_url}}"],
+              "path": ["h2-console"]
+            },
+            "description": "Opens the H2 in-memory database web console.\n\n⚠️ Open in a **browser** — this is an HTML UI, not a REST endpoint.\n\n**Connection settings:**\n```\nJDBC URL:  jdbc:h2:mem:majipoa\nUsername:  sa\nPassword:  (leave blank)\n```\n\nUse this to inspect database tables and run SQL queries during development."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
