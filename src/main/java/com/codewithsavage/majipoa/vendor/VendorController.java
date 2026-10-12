@@ -22,7 +22,7 @@ import java.util.List;
  *   1. @AuthenticationPrincipal OidcUser  → currentUser() → AppUser from DB
  *   2. AppUser passed to VendorService method
  *   3. VendorService returns a DTO
- *   4. Controller returns the DTO (Spring serializes to JSON)
+ *   4. controller returns the DTO (Spring serializes to JSON)
  *
  * Endpoint map:
  *
