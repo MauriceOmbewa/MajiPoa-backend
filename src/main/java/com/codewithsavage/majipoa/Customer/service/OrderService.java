@@ -7,11 +7,11 @@ import com.codewithsavage.majipoa.Customer.repository.OrderRepository;
 import com.codewithsavage.majipoa.Customer.repository.CustomerRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -20,6 +20,7 @@ public class OrderService {
     private final CustomerRepository  customerRepository;
     private final OrderRepository orderRepository;
 
+    @Transactional
     public Optional<OrderResponse> createOrder(String customerId) {
         //validate for cart items
         List<CartItem> cartItems = cartItemService.getCartItem(customerId);
@@ -38,7 +39,7 @@ public class OrderService {
 
         //calculate total price
         BigDecimal totalPrice = cartItems.stream()
-                .map(CartItem::getPrice)
+                .map(item -> item.getPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         //create order
         Order order = new Order();

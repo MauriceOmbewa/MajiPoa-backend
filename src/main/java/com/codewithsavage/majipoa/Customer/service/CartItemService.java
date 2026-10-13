@@ -42,7 +42,7 @@ public class CartItemService {
         if ( existingCartitem != null){
             //Update the quantity
             existingCartitem.setQuantity(existingCartitem.getQuantity() + request.getQuantity());
-            existingCartitem.setPrice(product.getPrice().multiply(BigDecimal.valueOf(existingCartitem.getQuantity())));
+            existingCartitem.setPrice(product.getPrice());
             cartItemRepository.save(existingCartitem);
         } else {
             //create new cart item
@@ -50,7 +50,7 @@ public class CartItemService {
             cartItem.setCustomer(customer);
             cartItem.setProduct(product);
             cartItem.setQuantity(request.getQuantity());
-            cartItem.setPrice(product.getPrice().multiply(BigDecimal.valueOf(request.getQuantity())));
+            cartItem.setPrice(product.getPrice());
             cartItemRepository.save(cartItem);
         }
         return true;
@@ -58,6 +58,7 @@ public class CartItemService {
 
     }
 
+    @Transactional
     public boolean deleteItemFromCart(String customerId, String productId) {
         Optional<Product> productOpt = productRepository.findById(productId);
         Optional<Customer> userOpt = customerRepository.findById(customerId);
@@ -74,6 +75,7 @@ public class CartItemService {
                 .orElseGet(List::of);
     }
 
+    @Transactional
     public void clearCart(String customerId) {
         customerRepository.findById(customerId).ifPresent(
                 cartItemRepository::deleteByCustomer
@@ -87,7 +89,8 @@ public class CartItemService {
 
         List<CartItemResponse> items = cartItems.stream()
                 .map(item -> {
-                    BigDecimal subtotal = item.getPrice()
+                    BigDecimal unitPrice = item.getProduct().getPrice();
+                    BigDecimal subtotal = unitPrice
                             .multiply(BigDecimal.valueOf(item.getQuantity()));
 
                     return new CartItemResponse(
@@ -96,7 +99,7 @@ public class CartItemService {
                             item.getProduct().getName(),
                             item.getProduct().getImageUrl(),
                             item.getQuantity(),
-                            item.getPrice(),
+                            unitPrice,
                             subtotal
                     );
                 })

@@ -3,7 +3,6 @@ package com.codewithsavage.majipoa.Customer.controller;
 import com.codewithsavage.majipoa.Customer.dto.CartItemRequest;
 import com.codewithsavage.majipoa.Customer.dto.CartResponse;
 import com.codewithsavage.majipoa.Customer.dto.CustomerResponse;
-import com.codewithsavage.majipoa.Customer.model.CartItem;
 import com.codewithsavage.majipoa.Customer.service.CartItemService;
 import com.codewithsavage.majipoa.Customer.service.CustomerService;
 import lombok.RequiredArgsConstructor;
@@ -12,8 +11,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/cart")
