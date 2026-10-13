@@ -1,0 +1,1649 @@
+{
+  "info": {
+    "name": "MajiPoa API",
+    "description": "Complete API collection for the MajiPoa water-delivery platform backend.\n\n## Authentication\nThis API uses **Google OAuth2 / OIDC** with server-side sessions (cookies). There is no token endpoint to call directly.\n\n### Sign-in flow\n1. Open `GET /oauth2/authorization/google` in a **browser** — this redirects you to Google's sign-in page.\n2. Sign in with Google. Spring Security processes the callback and sets a `JSESSIONID` session cookie.\n3. The browser is redirected to `http://localhost:4200/auth/callback` — the Angular frontend.\n4. The frontend (or Postman, if you copy the cookie) calls `GET /api/auth/me` to retrieve the user profile.\n\n### Using with Postman\n- Enable **\"Automatically follow redirects\"** and **\"Send cookies\"** in Postman settings.\n- Open the browser-based sign-in via the OAuth2 initiation request in the `🔐 OAuth2 Flow` folder.\n- Copy the resulting `JSESSIONID` cookie into the `session_cookie` collection variable, **or** use Postman's cookie manager to let it pass automatically.\n\n## Variables\n| Variable | Default | Description |\n|---|---|---|\n| `base_url` | `http://localhost:8080` | Backend base URL |\n| `order_ref` | `WM10262` | Sample vendor order reference |\n| `product_id` | `1` | Sample product ID |\n| `sale_id` | `1` | Sample offline sale ID |\n| `customer_id` | `` | Customer ID (auto-set on profile fetch) |\n| `cart_product_id` | `` | Product ID used in cart operations (auto-set on product create) |\n| `customer_order_id` | `` | Customer order ID (auto-set on order create) |",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "majipoa-api-collection-v1"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "order_ref",
+      "value": "WM10262",
+      "type": "string"
+    },
+    {
+      "key": "product_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "sale_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "customer_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "cart_product_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "customer_order_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "🔐 OAuth2 Flow",
+      "description": "Google OAuth2 sign-in flow endpoints. These are managed by Spring Security and must be opened in a browser to work correctly — they involve browser redirects to Google.",
+      "item": [
+        {
+          "name": "Initiate Google Sign-In",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/oauth2/authorization/google",
+              "host": ["{{base_url}}"],
+              "path": ["oauth2", "authorization", "google"]
+            },
+            "description": "Opens the Google OAuth2 sign-in flow.\n\n⚠️ **Open this in a browser**, not Postman — it redirects to Google's sign-in page.\n\nAfter a successful sign-in:\n- Spring Security creates a server-side session\n- Sets a `JSESSIONID` cookie in the browser\n- Redirects to `http://localhost:4200/auth/callback`\n\nCopy the `JSESSIONID` cookie value into the `session_cookie` collection variable to authenticate Postman requests."
+          },
+          "response": []
+        },
+        {
+          "name": "OAuth2 Callback (Google → Spring)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/login/oauth2/code/google?code=GOOGLE_AUTH_CODE&state=STATE",
+              "host": ["{{base_url}}"],
+              "path": ["login", "oauth2", "code", "google"],
+              "query": [
+                {
+                  "key": "code",
+                  "value": "GOOGLE_AUTH_CODE",
+                  "description": "Authorization code returned by Google (automatically populated during real flow)"
+                },
+                {
+                  "key": "state",
+                  "value": "STATE",
+                  "description": "CSRF state token (automatically populated during real flow)"
+                }
+              ]
+            },
+            "description": "The OAuth2 callback URL that Google redirects to after successful sign-in.\n\n⚠️ This is handled automatically by Spring Security during the real OAuth2 flow — you do not call this endpoint directly. It is listed here for documentation purposes only."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "👤 Auth",
+      "description": "Session management and role-switching endpoints. All require an authenticated session (Google OAuth2 cookie).",
+      "item": [
+        {
+          "name": "Get Current User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has user fields', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('id');",
+                  "    pm.expect(json).to.have.property('email');",
+                  "    pm.expect(json).to.have.property('role');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/auth/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "me"]
+            },
+            "description": "Returns the currently authenticated user's profile.\n\nCalled by the Angular frontend after the OAuth2 callback to restore session state and determine which role-based view to show.\n\n**Response fields:**\n| Field | Type | Description |\n|---|---|---|\n| `id` | Long | Internal DB user ID |\n| `email` | String | Google account email |\n| `name` | String | Display name from Google |\n| `pictureUrl` | String | Google profile picture URL |\n| `role` | String | `CUSTOMER` \\| `VENDOR` \\| `RIDER` \\| `ADMIN` |"
+          },
+          "response": [
+            {
+              "name": "200 OK — Customer",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/auth/me",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "auth", "me"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": 1,\n  \"email\": \"jane.doe@gmail.com\",\n  \"name\": \"Jane Doe\",\n  \"pictureUrl\": \"https://lh3.googleusercontent.com/a/example\",\n  \"role\": \"CUSTOMER\"\n}"
+            },
+            {
+              "name": "200 OK — Vendor",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/auth/me",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "auth", "me"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": 2,\n  \"email\": \"vendor@example.com\",\n  \"name\": \"Peter Kamau\",\n  \"pictureUrl\": \"https://lh3.googleusercontent.com/a/vendor\",\n  \"role\": \"VENDOR\"\n}"
+            },
+            {
+              "name": "401 Unauthorized",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/auth/me",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "auth", "me"]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "text",
+              "header": [],
+              "body": ""
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 204', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "logout"]
+            },
+            "description": "Ends the server-side session.\n\nInvalidates the current `JSESSIONID` cookie. All subsequent requests will return `401 Unauthorized` until the user signs in again via Google OAuth2.\n\n**Response:** `204 No Content`"
+          },
+          "response": [
+            {
+              "name": "204 No Content",
+              "originalRequest": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{base_url}}/api/auth/logout",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "auth", "logout"]
+                }
+              },
+              "status": "No Content",
+              "code": 204,
+              "_postman_previewlanguage": "text",
+              "header": [],
+              "body": ""
+            }
+          ]
+        },
+        {
+          "name": "Switch Role",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Role was updated', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('role');",
+                  "    pm.expect(['VENDOR', 'RIDER']).to.include(json.role);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"VENDOR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/role",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "role"]
+            },
+            "description": "Permanently upgrades the authenticated user's role.\n\nCalled when the user accepts the \"Join as vendor\" or \"Become a rider\" confirmation screen. This is a **one-way operation** — once set to VENDOR, the user cannot be demoted via API.\n\n**Allowed role values:** `VENDOR`, `RIDER`\n\n**Body:**\n```json\n{ \"role\": \"VENDOR\" }\n```\n\n**Response:** `UserResponse` with updated role."
+          },
+          "response": [
+            {
+              "name": "200 OK — Upgraded to VENDOR",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"role\": \"VENDOR\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/auth/role",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "auth", "role"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": 1,\n  \"email\": \"jane.doe@gmail.com\",\n  \"name\": \"Jane Doe\",\n  \"pictureUrl\": \"https://lh3.googleusercontent.com/a/example\",\n  \"role\": \"VENDOR\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "🛒 Customer",
+      "description": "All customer-facing endpoints covering profile management, product browsing, cart operations, and order placement.\n\n## Authentication\nEndpoints marked with 🔒 require `ROLE_CUSTOMER` (authenticated Google session with CUSTOMER role).\nEndpoints marked with 🔑 require `ROLE_ADMIN`.\nUnmarked endpoints are publicly accessible.\n\n## Dynamic Variables\n- `customer_id` — auto-populated from **Get My Profile**\n- `cart_product_id` — auto-populated from **Create Product**\n- `customer_order_id` — auto-populated from **Place Order**",
+      "item": [
+        {
+          "name": "👤 Profile",
+          "description": "Customer profile management. Covers fetching and updating the authenticated customer's own profile, as well as admin-level customer lookup.",
+          "item": [
+            {
+              "name": "Get My Profile 🔒",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Status is 200', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "pm.test('Response has customer fields', function () {",
+                      "    const json = pm.response.json();",
+                      "    pm.expect(json).to.have.property('customerId');",
+                      "    pm.expect(json).to.have.property('email');",
+                      "    pm.expect(json).to.have.property('role');",
+                      "});",
+                      "",
+                      "// Auto-save customerId for subsequent requests",
+                      "const json = pm.response.json();",
+                      "if (json && json.customerId) {",
+                      "    pm.collectionVariables.set('customer_id', json.customerId);",
+                      "    console.log('customer_id set to: ' + json.customerId);",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/customer/me",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "customer", "me"]
+                },
+                "description": "Returns the profile of the currently authenticated customer.\n\nRequires `ROLE_CUSTOMER`. The customer is resolved from the session cookie — no ID needed in the URL.\n\nThe test script **automatically saves** the `customerId` to the `customer_id` collection variable for use in other requests.\n\n**Response fields:**\n| Field | Type | Description |\n|---|---|---|\n| `customerId` | String | Internal customer UUID |\n| `email` | String | Google account email |\n| `firstName` | String | First name |\n| `lastName` | String | Last name |\n| `userName` | String | Display username |\n| `pictureUrl` | String | Google profile picture |\n| `role` | String | `CUSTOMER` |\n| `phoneNumber` | String | Phone number |\n| `address` | Object | Delivery address |"
+              },
+              "response": [
+                {
+                  "name": "200 OK",
+                  "originalRequest": {
+                    "method": "GET",
+                    "url": {
+                      "raw": "{{base_url}}/api/customer/me",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "customer", "me"]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [{ "key": "Content-Type", "value": "application/json" }],
+                  "body": "{\n  \"customerId\": \"cust-uuid-001\",\n  \"email\": \"jane.doe@gmail.com\",\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Doe\",\n  \"userName\": \"janedoe\",\n  \"pictureUrl\": \"https://lh3.googleusercontent.com/a/example\",\n  \"role\": \"CUSTOMER\",\n  \"phoneNumber\": \"+254712345678\",\n  \"address\": {\n    \"county\": \"Nairobi\",\n    \"subCounty\": \"Westlands\",\n    \"area\": \"Parklands\",\n    \"street\": \"3rd Parklands Avenue\",\n    \"building\": \"Apex Building\",\n    \"landmark\": \"Near Total Petrol Station\",\n    \"pinLocation\": \"-1.2635,36.8080\"\n  }\n}"
+                },
+                {
+                  "name": "401 Unauthorized",
+                  "originalRequest": {
+                    "method": "GET",
+                    "url": {
+                      "raw": "{{base_url}}/api/customer/me",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "customer", "me"]
+                    }
+                  },
+                  "status": "Unauthorized",
+                  "code": 401,
+                  "_postman_previewlanguage": "text",
+                  "header": [],
+                  "body": ""
+                }
+              ]
+            },
+            {
+              "name": "Update My Profile 🔒",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Status is 200', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "pm.test('Profile was updated', function () {",
+                      "    const json = pm.response.json();",
+                      "    pm.expect(json).to.have.property('customerId');",
+                      "    pm.expect(json).to.have.property('firstName');",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Doe\",\n  \"email\": \"jane.doe@gmail.com\",\n  \"userName\": \"janedoe\",\n  \"phoneNumber\": \"+254712345678\",\n  \"address\": {\n    \"county\": \"Nairobi\",\n    \"subCounty\": \"Westlands\",\n    \"area\": \"Parklands\",\n    \"street\": \"3rd Parklands Avenue\",\n    \"building\": \"Apex Building\",\n    \"landmark\": \"Near Total Petrol Station\",\n    \"pinLocation\": \"-1.2635,36.8080\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/customer/me",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "customer", "me"]
+                },
+                "description": "Updates the authenticated customer's profile.\n\nRequires `ROLE_CUSTOMER`. The customer is resolved from the session — no ID in the URL.\n\n**Body fields:**\n| Field | Required | Description |\n|---|---|---|\n| `firstName` | ✅ | First name |\n| `lastName` | ✅ | Last name |\n| `email` | ✅ | Email address |\n| `userName` | ✅ | Display username |\n| `phoneNumber` | ❌ | Phone number (e.g. `+254712345678`) |\n| `address` | ❌ | Nested delivery address object |\n| `address.county` | ❌ | County (e.g. Nairobi) |\n| `address.subCounty` | ❌ | Sub-county |\n| `address.area` | ❌ | Area/neighbourhood |\n| `address.street` | ❌ | Street name |\n| `address.building` | ❌ | Building name |\n| `address.landmark` | ❌ | Nearby landmark |\n| `address.pinLocation` | ❌ | GPS coordinates (`lat,lng`) |"
+              },
+              "response": [
+                {
+                  "name": "200 OK",
+                  "originalRequest": {
+                    "method": "PUT",
+                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Doe\",\n  \"email\": \"jane.doe@gmail.com\",\n  \"userName\": \"janedoe\",\n  \"phoneNumber\": \"+254712345678\",\n  \"address\": {\n    \"county\": \"Nairobi\",\n    \"subCounty\": \"Westlands\",\n    \"area\": \"Parklands\",\n    \"street\": \"3rd Parklands Avenue\",\n    \"building\": \"Apex Building\",\n    \"landmark\": \"Near Total Petrol Station\",\n    \"pinLocation\": \"-1.2635,36.8080\"\n  }\n}"
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/customer/me",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "customer", "me"]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [{ "key": "Content-Type", "value": "application/json" }],
+                  "body": "{\n  \"customerId\": \"cust-uuid-001\",\n  \"email\": \"jane.doe@gmail.com\",\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Doe\",\n  \"userName\": \"janedoe\",\n  \"pictureUrl\": \"https://lh3.googleusercontent.com/a/example\",\n  \"role\": \"CUSTOMER\",\n  \"phoneNumber\": \"+254712345678\",\n  \"address\": {\n    \"county\": \"Nairobi\",\n    \"subCounty\": \"Westlands\",\n    \"area\": \"Parklands\",\n    \"street\": \"3rd Parklands Avenue\",\n    \"building\": \"Apex Building\",\n    \"landmark\": \"Near Total Petrol Station\",\n    \"pinLocation\": \"-1.2635,36.8080\"\n  }\n}"
+                }
+              ]
+            },
+            {
+              "name": "Get Customer by ID",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Status is 200 or 404', function () {",
+                      "    pm.expect([200, 404]).to.include(pm.response.code);",
+                      "});",
+                      "",
+                      "if (pm.response.code === 200) {",
+                      "    pm.test('Response has customerId', function () {",
+                      "        const json = pm.response.json();",
+                      "        pm.expect(json).to.have.property('customerId');",
+                      "    });",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/customer/{{customer_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "customer", "{{customer_id}}"]
+                },
+                "description": "Fetches a customer profile by their internal ID.\n\nUses the `customer_id` variable which is automatically set when **Get My Profile** runs.\n\n**Path variable:** `customerId` (String UUID)"
+              },
+              "response": [
+                {
+                  "name": "200 OK",
+                  "originalRequest": {
+                    "method": "GET",
+                    "url": {
+                      "raw": "{{base_url}}/api/customer/cust-uuid-001",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "customer", "cust-uuid-001"]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [{ "key": "Content-Type", "value": "application/json" }],
+                  "body": "{\n  \"customerId\": \"cust-uuid-001\",\n  \"email\": \"jane.doe@gmail.com\",\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Doe\",\n  \"userName\": \"janedoe\",\n  \"pictureUrl\": \"https://lh3.googleusercontent.com/a/example\",\n  \"role\": \"CUSTOMER\",\n  \"phoneNumber\": \"+254712345678\",\n  \"address\": {\n    \"county\": \"Nairobi\",\n    \"subCounty\": \"Westlands\",\n    \"area\": \"Parklands\",\n    \"street\": \"3rd Parklands Avenue\",\n    \"building\": \"Apex Building\",\n    \"landmark\": \"Near Total Petrol Station\",\n    \"pinLocation\": \"-1.2635,36.8080\"\n  }\n}"
+                },
+                {
+                  "name": "404 Not Found",
+                  "originalRequest": {
+                    "method": "GET",
+                    "url": {
+                      "raw": "{{base_url}}/api/customer/nonexistent-id",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "customer", "nonexistent-id"]
+                    }
+                  },
+                  "status": "Not Found",
+                  "code": 404,
+                  "_postman_previewlanguage": "text",
+                  "header": [],
+                  "body": ""
+                }
+              ]
+            },
+            {
+              "name": "Update Customer by ID",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Status is 200 or 404', function () {",
+                      "    pm.expect([200, 404]).to.include(pm.response.code);",
+                      "});",
+                      "",
+                      "if (pm.response.code === 200) {",
+                      "    pm.test('Success message returned', function () {",
+                      "        pm.expect(pm.response.text()).to.include('updated successfully');",
+                      "    });",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Doe\",\n  \"email\": \"jane.doe@gmail.com\",\n  \"userName\": \"janedoe_updated\",\n  \"phoneNumber\": \"+254712345678\",\n  \"address\": {\n    \"county\": \"Nairobi\",\n    \"subCounty\": \"Westlands\",\n    \"area\": \"Parklands\",\n    \"street\": \"3rd Parklands Avenue\",\n    \"building\": \"Apex Building\",\n    \"landmark\": \"Near Total Petrol Station\",\n    \"pinLocation\": \"-1.2635,36.8080\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/customer/{{customer_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "customer", "{{customer_id}}"]
+                },
+                "description": "Updates a customer by their ID.\n\nUses the `customer_id` variable. Same request body shape as **Update My Profile**.\n\n**Response:** `\"Customer updated successfully\"` (200) or 404 if not found."
+              },
+              "response": [
+                {
+                  "name": "200 OK",
+                  "originalRequest": {
+                    "method": "PUT",
+                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Doe\",\n  \"email\": \"jane.doe@gmail.com\",\n  \"userName\": \"janedoe_updated\",\n  \"phoneNumber\": \"+254712345678\",\n  \"address\": {\n    \"county\": \"Nairobi\",\n    \"subCounty\": \"Westlands\",\n    \"area\": \"Parklands\",\n    \"street\": \"3rd Parklands Avenue\",\n    \"building\": \"Apex Building\",\n    \"landmark\": \"Near Total Petrol Station\",\n    \"pinLocation\": \"-1.2635,36.8080\"\n  }\n}"
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/customer/cust-uuid-001",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "customer", "cust-uuid-001"]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "text",
+                  "header": [{ "key": "Content-Type", "value": "text/plain" }],
+                  "body": "Customer updated successfully"
+                }
+              ]
+            },
+            {
+              "name": "Get All Customers 🔑",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Status is 200', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "pm.test('Response is an array', function () {",
+                      "    pm.expect(pm.response.json()).to.be.an('array');",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/customer",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "customer"]
+                },
+                "description": "Returns all registered customers.\n\n⚠️ Requires `ROLE_ADMIN`. Returns 403 for any other role."
+              },
+              "response": [
+                {
+                  "name": "200 OK",
+                  "originalRequest": {
+                    "method": "GET",
+                    "url": {
+                      "raw": "{{base_url}}/api/customer",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "customer"]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [{ "key": "Content-Type", "value": "application/json" }],
+                  "body": "[\n  {\n    \"customerId\": \"cust-uuid-001\",\n    \"email\": \"jane.doe@gmail.com\",\n    \"firstName\": \"Jane\",\n    \"lastName\": \"Doe\",\n    \"userName\": \"janedoe\",\n    \"pictureUrl\": \"https://lh3.googleusercontent.com/a/example\",\n    \"role\": \"CUSTOMER\",\n    \"phoneNumber\": \"+254712345678\",\n    \"address\": {\n      \"county\": \"Nairobi\",\n      \"subCounty\": \"Westlands\",\n      \"area\": \"Parklands\",\n      \"street\": \"3rd Parklands Avenue\",\n      \"building\": \"Apex Building\",\n      \"landmark\": \"Near Total Petrol Station\",\n      \"pinLocation\": \"-1.2635,36.8080\"\n    }\n  }\n]"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "🧴 Products",
+          "description": "Product catalogue endpoints. Browse, search, create, update, and delete products.\n\nNo authentication required for read operations. Write operations are currently unguarded (to be secured in future).",
+          "item": [
+            {
+              "name": "Create Product",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Status is 201', function () {",
+                      "    pm.response.to.have.status(201);",
+                      "});",
+                      "",
+                      "pm.test('Response has productId', function () {",
+                      "    const json = pm.response.json();",
+                      "    pm.expect(json).to.have.property('productId');",
+                      "});",
+                      "",
+                      "// Auto-save productId for cart and update requests",
+                      "const json = pm.response.json();",
+                      "if (json && json.productId) {",
+                      "    pm.collectionVariables.set('cart_product_id', json.productId);",
+                      "    pm.collectionVariables.set('product_id', json.productId);",
+                      "    console.log('cart_product_id set to: ' + json.productId);",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"20L Refill\",\n  \"description\": \"Clean spring water, UV treated and mineralised\",\n  \"price\": 500,\n  \"stockQuantity\": 50,\n  \"category\": \"Refill\",\n  \"imageUrl\": \"https://cdn.majipoa.co.ke/products/20l-refill.jpg\",\n  \"size\": \"20L\",\n  \"status\": \"SELLING\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/products",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "products"]
+                },
+                "description": "Creates a new product in the catalogue.\n\nThe test script **automatically saves** the `productId` to both `cart_product_id` and `product_id` variables.\n\n**Body fields:**\n| Field | Required | Type | Description |\n|---|---|---|---|\n| `name` | ✅ | String | Product name |\n| `description` | ✅ | String | Product description |\n| `price` | ✅ | BigDecimal | Selling price in KES |\n| `stockQuantity` | ✅ | Integer | Available stock |\n| `category` | ✅ | String | Category (e.g. `Refill`, `Bottle`) |\n| `imageUrl` | ❌ | String | Product image URL |\n| `size` | ❌ | String | Size label (e.g. `20L`, `500ml`) |\n| `status` | ❌ | String | `SELLING` \\| `PAUSED` \\| `OUT_OF_STOCK` |\n\n**Response:** `201 Created`"
+              },
+              "response": [
+                {
+                  "name": "201 Created",
+                  "originalRequest": {
+                    "method": "POST",
+                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": \"20L Refill\",\n  \"description\": \"Clean spring water, UV treated and mineralised\",\n  \"price\": 500,\n  \"stockQuantity\": 50,\n  \"category\": \"Refill\",\n  \"imageUrl\": \"https://cdn.majipoa.co.ke/products/20l-refill.jpg\",\n  \"size\": \"20L\",\n  \"status\": \"SELLING\"\n}"
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/products",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "products"]
+                    }
+                  },
+                  "status": "Created",
+                  "code": 201,
+                  "_postman_previewlanguage": "json",
+                  "header": [{ "key": "Content-Type", "value": "application/json" }],
+                  "body": "{\n  \"productId\": \"prod-uuid-001\",\n  \"name\": \"20L Refill\",\n  \"description\": \"Clean spring water, UV treated and mineralised\",\n  \"price\": 500,\n  \"stockQuantity\": 50,\n  \"category\": \"Refill\",\n  \"imageUrl\": \"https://cdn.majipoa.co.ke/products/20l-refill.jpg\",\n  \"size\": \"20L\",\n  \"status\": \"SELLING\",\n  \"active\": true\n}"
+                }
+              ]
+            },
+            {
+              "name": "Get All Products",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Status is 200', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "pm.test('Response is an array', function () {",
+                      "    pm.expect(pm.response.json()).to.be.an('array');",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/products",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "products"]
+                },
+                "description": "Returns all products in the catalogue.\n\nNo authentication required. This is the endpoint the customer marketplace screen calls to populate the product listing.\n\n**Product status values:** `SELLING` | `PAUSED` | `OUT_OF_STOCK`"
+              },
+              "response": [
+                {
+                  "name": "200 OK",
+                  "originalRequest": {
+                    "method": "GET",
+                    "url": {
+                      "raw": "{{base_url}}/api/products",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "products"]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [{ "key": "Content-Type", "value": "application/json" }],
+                  "body": "[\n  {\n    \"productId\": \"prod-uuid-001\",\n    \"name\": \"20L Refill\",\n    \"description\": \"Clean spring water, UV treated and mineralised\",\n    \"price\": 500,\n    \"stockQuantity\": 50,\n    \"category\": \"Refill\",\n    \"imageUrl\": \"https://cdn.majipoa.co.ke/products/20l-refill.jpg\",\n    \"size\": \"20L\",\n    \"status\": \"SELLING\",\n    \"active\": true\n  },\n  {\n    \"productId\": \"prod-uuid-002\",\n    \"name\": \"500ml Bottle\",\n    \"description\": \"Cold still water\",\n    \"price\": 67,\n    \"stockQuantity\": 200,\n    \"category\": \"Bottle\",\n    \"imageUrl\": \"https://cdn.majipoa.co.ke/products/500ml.jpg\",\n    \"size\": \"500ml\",\n    \"status\": \"SELLING\",\n    \"active\": true\n  }\n]"
+                }
+              ]
+            },
+            {
+              "name": "Search Products",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Status is 200', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "pm.test('Response is an array', function () {",
+                      "    pm.expect(pm.response.json()).to.be.an('array');",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/products/search?keyword=20L",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "products", "search"],
+                  "query": [
+                    {
+                      "key": "keyword",
+                      "value": "20L",
+                      "description": "Search term — matches against product name, description, category, or size"
+                    }
+                  ]
+                },
+                "description": "Searches the product catalogue by a keyword.\n\nNo authentication required.\n\n**Query param:** `keyword` (String, required)\n\nMatches against name, description, category, and size fields."
+              },
+              "response": [
+                {
+                  "name": "200 OK",
+                  "originalRequest": {
+                    "method": "GET",
+                    "url": {
+                      "raw": "{{base_url}}/api/products/search?keyword=20L",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "products", "search"],
+                      "query": [{ "key": "keyword", "value": "20L" }]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [{ "key": "Content-Type", "value": "application/json" }],
+                  "body": "[\n  {\n    \"productId\": \"prod-uuid-001\",\n    \"name\": \"20L Refill\",\n    \"description\": \"Clean spring water, UV treated and mineralised\",\n    \"price\": 500,\n    \"stockQuantity\": 50,\n    \"category\": \"Refill\",\n    \"imageUrl\": \"https://cdn.majipoa.co.ke/products/20l-refill.jpg\",\n    \"size\": \"20L\",\n    \"status\": \"SELLING\",\n    \"active\": true\n  }\n]"
+                }
+              ]
+            },
+            {
+              "name": "Update Product",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Status is 200 or 404', function () {",
+                      "    pm.expect([200, 404]).to.include(pm.response.code);",
+                      "});",
+                      "",
+                      "if (pm.response.code === 200) {",
+                      "    pm.test('Response has productId', function () {",
+                      "        const json = pm.response.json();",
+                      "        pm.expect(json).to.have.property('productId');",
+                      "    });",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"20L Refill\",\n  \"description\": \"Premium UV + RO treated water, re-mineralised\",\n  \"price\": 550,\n  \"stockQuantity\": 60,\n  \"category\": \"Refill\",\n  \"imageUrl\": \"https://cdn.majipoa.co.ke/products/20l-refill.jpg\",\n  \"size\": \"20L\",\n  \"status\": \"SELLING\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/products/{{product_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "products", "{{product_id}}"]
+                },
+                "description": "Updates an existing product.\n\nUses the `product_id` variable (auto-set by Create Product).\n\nSame body shape as Create Product. All fields are replaced.\n\n**Response:** `ProductResponse` (200) or 404 if not found."
+              },
+              "response": [
+                {
+                  "name": "200 OK",
+                  "originalRequest": {
+                    "method": "PUT",
+                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": \"20L Refill\",\n  \"description\": \"Premium UV + RO treated water, re-mineralised\",\n  \"price\": 550,\n  \"stockQuantity\": 60,\n  \"category\": \"Refill\",\n  \"imageUrl\": \"https://cdn.majipoa.co.ke/products/20l-refill.jpg\",\n  \"size\": \"20L\",\n  \"status\": \"SELLING\"\n}"
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/products/prod-uuid-001",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "products", "prod-uuid-001"]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [{ "key": "Content-Type", "value": "application/json" }],
+                  "body": "{\n  \"productId\": \"prod-uuid-001\",\n  \"name\": \"20L Refill\",\n  \"description\": \"Premium UV + RO treated water, re-mineralised\",\n  \"price\": 550,\n  \"stockQuantity\": 60,\n  \"category\": \"Refill\",\n  \"imageUrl\": \"https://cdn.majipoa.co.ke/products/20l-refill.jpg\",\n  \"size\": \"20L\",\n  \"status\": \"SELLING\",\n  \"active\": true\n}"
+                }
+              ]
+            },
+            {
+              "name": "Delete Product",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Status is 204 or 404', function () {",
+                      "    pm.expect([204, 404]).to.include(pm.response.code);",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/products/{{product_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "products", "{{product_id}}"]
+                },
+                "description": "Deletes a product from the catalogue by its ID.\n\nUses the `product_id` variable.\n\n**Response:** `204 No Content` (deleted) or `404 Not Found`"
+              },
+              "response": [
+                {
+                  "name": "204 No Content",
+                  "originalRequest": {
+                    "method": "DELETE",
+                    "url": {
+                      "raw": "{{base_url}}/api/products/prod-uuid-001",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "products", "prod-uuid-001"]
+                    }
+                  },
+                  "status": "No Content",
+                  "code": 204,
+                  "_postman_previewlanguage": "text",
+                  "header": [],
+                  "body": ""
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "🛒 Cart",
+          "description": "Shopping cart endpoints. All require `ROLE_CUSTOMER`.\n\nThe customer is always resolved from the session cookie — no customer ID in the URL.\n\n**Typical flow:** Add items → View cart → Place order",
+          "item": [
+            {
+              "name": "Add Item to Cart 🔒",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Status is 201 or 400', function () {",
+                      "    pm.expect([201, 400]).to.include(pm.response.code);",
+                      "});",
+                      "",
+                      "if (pm.response.code === 400) {",
+                      "    pm.test('Error message present', function () {",
+                      "        pm.expect(pm.response.text()).to.include('not found');",
+                      "    });",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"productId\": \"{{cart_product_id}}\",\n  \"quantity\": 2\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/cart",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "cart"]
+                },
+                "description": "Adds a product to the authenticated customer's cart.\n\nRequires `ROLE_CUSTOMER`. Uses `cart_product_id` variable (auto-set by Create Product).\n\n**Body fields:**\n| Field | Required | Type | Description |\n|---|---|---|---|\n| `productId` | ✅ | String | ID of the product to add |\n| `quantity` | ✅ | Integer | Number of units to add |\n\n**Response:**\n- `201 Created` — item added successfully (empty body)\n- `400 Bad Request` — product out of stock, product not found, or customer not found"
+              },
+              "response": [
+                {
+                  "name": "201 Created",
+                  "originalRequest": {
+                    "method": "POST",
+                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"productId\": \"prod-uuid-001\",\n  \"quantity\": 2\n}"
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/cart",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "cart"]
+                    }
+                  },
+                  "status": "Created",
+                  "code": 201,
+                  "_postman_previewlanguage": "text",
+                  "header": [],
+                  "body": ""
+                },
+                {
+                  "name": "400 Bad Request — Out of Stock",
+                  "originalRequest": {
+                    "method": "POST",
+                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"productId\": \"prod-uuid-out-of-stock\",\n  \"quantity\": 2\n}"
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/cart",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "cart"]
+                    }
+                  },
+                  "status": "Bad Request",
+                  "code": 400,
+                  "_postman_previewlanguage": "text",
+                  "header": [{ "key": "Content-Type", "value": "text/plain" }],
+                  "body": "Product Out of Stock or User not found or Product not found"
+                }
+              ]
+            },
+            {
+              "name": "Get Cart 🔒",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Status is 200', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "pm.test('Response has cart fields', function () {",
+                      "    const json = pm.response.json();",
+                      "    pm.expect(json).to.have.property('items');",
+                      "    pm.expect(json).to.have.property('totalAmount');",
+                      "    pm.expect(json.items).to.be.an('array');",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/cart",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "cart"]
+                },
+                "description": "Returns the authenticated customer's current cart.\n\nRequires `ROLE_CUSTOMER`.\n\n**Response fields:**\n| Field | Type | Description |\n|---|---|---|\n| `items` | Array | List of cart items |\n| `items[].cartItemId` | String | Cart item UUID |\n| `items[].productId` | String | Product UUID |\n| `items[].productName` | String | Product name |\n| `items[].imageUrl` | String | Product image |\n| `items[].quantity` | Integer | Quantity in cart |\n| `items[].price` | BigDecimal | Unit price |\n| `items[].subtotal` | BigDecimal | quantity × price |\n| `totalQuantity` | Integer | Sum of all quantities |\n| `totalAmount` | BigDecimal | Sum of all subtotals |"
+              },
+              "response": [
+                {
+                  "name": "200 OK",
+                  "originalRequest": {
+                    "method": "GET",
+                    "url": {
+                      "raw": "{{base_url}}/api/cart",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "cart"]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [{ "key": "Content-Type", "value": "application/json" }],
+                  "body": "{\n  \"items\": [\n    {\n      \"cartItemId\": \"cart-item-uuid-001\",\n      \"productId\": \"prod-uuid-001\",\n      \"productName\": \"20L Refill\",\n      \"imageUrl\": \"https://cdn.majipoa.co.ke/products/20l-refill.jpg\",\n      \"quantity\": 2,\n      \"price\": 500,\n      \"subtotal\": 1000\n    }\n  ],\n  \"totalQuantity\": 2,\n  \"totalAmount\": 1000\n}"
+                }
+              ]
+            },
+            {
+              "name": "Remove Item from Cart 🔒",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Status is 204 or 404', function () {",
+                      "    pm.expect([204, 404]).to.include(pm.response.code);",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/cart/items/{{cart_product_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "cart", "items", "{{cart_product_id}}"]
+                },
+                "description": "Removes a specific product from the authenticated customer's cart.\n\nRequires `ROLE_CUSTOMER`. Uses `cart_product_id` variable.\n\n**Path variable:** `productId` — the product to remove from the cart\n\n**Response:**\n- `204 No Content` — item removed\n- `404 Not Found` — item not in cart"
+              },
+              "response": [
+                {
+                  "name": "204 No Content",
+                  "originalRequest": {
+                    "method": "DELETE",
+                    "url": {
+                      "raw": "{{base_url}}/api/cart/items/prod-uuid-001",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "cart", "items", "prod-uuid-001"]
+                    }
+                  },
+                  "status": "No Content",
+                  "code": 204,
+                  "_postman_previewlanguage": "text",
+                  "header": [],
+                  "body": ""
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "📦 Orders",
+          "description": "Order placement. Requires `ROLE_CUSTOMER`.\n\nAn order is created directly from the customer's current cart — no body needed. The cart must have at least one item.",
+          "item": [
+            {
+              "name": "Place Order 🔒",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Status is 201 or 400', function () {",
+                      "    pm.expect([201, 400]).to.include(pm.response.code);",
+                      "});",
+                      "",
+                      "if (pm.response.code === 201) {",
+                      "    pm.test('Response has orderId', function () {",
+                      "        const json = pm.response.json();",
+                      "        pm.expect(json).to.have.property('orderId');",
+                      "        pm.expect(json).to.have.property('status');",
+                      "        pm.expect(json).to.have.property('totalAmount');",
+                      "    });",
+                      "",
+                      "    // Auto-save orderId for tracking",
+                      "    const json = pm.response.json();",
+                      "    if (json && json.orderId) {",
+                      "        pm.collectionVariables.set('customer_order_id', json.orderId);",
+                      "        console.log('customer_order_id set to: ' + json.orderId);",
+                      "    }",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/orders",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "orders"]
+                },
+                "description": "Places an order from the authenticated customer's cart.\n\nRequires `ROLE_CUSTOMER`. No request body — the order is built automatically from all items currently in the cart.\n\nThe test script **automatically saves** the `orderId` to the `customer_order_id` variable.\n\n**Pre-condition:** Cart must have at least one item. Use **Add Item to Cart** first.\n\n**Response fields:**\n| Field | Type | Description |\n|---|---|---|\n| `orderId` | String | Order UUID |\n| `totalAmount` | BigDecimal | Total order value in KES |\n| `status` | String | Initial status: `PENDING` |\n| `items` | Array | Snapshot of ordered items |\n| `items[].id` | String | Order item UUID |\n| `items[].productId` | String | Product UUID |\n| `items[].quantity` | Integer | Quantity ordered |\n| `items[].price` | BigDecimal | Unit price at time of order |\n| `items[].subTotal` | BigDecimal | quantity × price |\n| `createdAt` | String | ISO-8601 timestamp |\n\n**Order status values:** `PENDING` → `CONFIRMED` → `SHIPPED` → `DELIVERED` (or `CANCELLED`)\n\n**Response:**\n- `201 Created` — order placed successfully\n- `400 Bad Request` — cart is empty or customer not found"
+              },
+              "response": [
+                {
+                  "name": "201 Created",
+                  "originalRequest": {
+                    "method": "POST",
+                    "url": {
+                      "raw": "{{base_url}}/api/orders",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "orders"]
+                    }
+                  },
+                  "status": "Created",
+                  "code": 201,
+                  "_postman_previewlanguage": "json",
+                  "header": [{ "key": "Content-Type", "value": "application/json" }],
+                  "body": "{\n  \"orderId\": \"order-uuid-001\",\n  \"totalAmount\": 1000,\n  \"status\": \"PENDING\",\n  \"items\": [\n    {\n      \"id\": \"order-item-uuid-001\",\n      \"productId\": \"prod-uuid-001\",\n      \"quantity\": 2,\n      \"price\": 500,\n      \"subTotal\": 1000\n    }\n  ],\n  \"createdAt\": \"2026-10-11T07:00:00\"\n}"
+                },
+                {
+                  "name": "400 Bad Request — Empty Cart",
+                  "originalRequest": {
+                    "method": "POST",
+                    "url": {
+                      "raw": "{{base_url}}/api/orders",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "orders"]
+                    }
+                  },
+                  "status": "Bad Request",
+                  "code": 400,
+                  "_postman_previewlanguage": "text",
+                  "header": [],
+                  "body": ""
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "🏪 Vendor — Dashboard",
+      "description": "Vendor portal dashboard endpoint. Requires `ROLE_VENDOR`.",
+      "item": [
+        {
+          "name": "Get Dashboard",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has dashboard fields', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('salesToday');",
+                  "    pm.expect(json).to.have.property('ordersToday');",
+                  "    pm.expect(json).to.have.property('jugsInStock');",
+                  "    pm.expect(json).to.have.property('incoming');",
+                  "    pm.expect(json).to.have.property('active');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/dashboard",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "dashboard"]
+            },
+            "description": "Returns the vendor's dashboard summary: today's sales totals, incoming orders, active deliveries, and stock levels."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/vendor/dashboard",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "vendor", "dashboard"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"salesToday\": 14500,\n  \"ordersToday\": 12,\n  \"completedToday\": 8,\n  \"jugsInStock\": 45,\n  \"jugsCapacity\": 100,\n  \"incoming\": [\n    {\n      \"id\": 101,\n      \"orderRef\": \"#WM10262\",\n      \"items\": \"20L x2, 500ml x3\",\n      \"area\": \"Westlands\",\n      \"distanceKm\": 2.4,\n      \"total\": 1200,\n      \"minutesAgo\": 5\n    }\n  ],\n  \"active\": [\n    {\n      \"id\": 100,\n      \"orderRef\": \"#WM10261\",\n      \"items\": \"20L x1\",\n      \"area\": \"Kilimani\",\n      \"stage\": \"On the way\"\n    }\n  ]\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "📦 Vendor — Orders",
+      "description": "Order management endpoints. Covers the full order lifecycle: NEW → PREPARING → READY → OUT_FOR_DELIVERY → COMPLETED.\n\nAll require `ROLE_VENDOR`.",
+      "item": [
+        {
+          "name": "List Orders",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is an array', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/orders",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "orders"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Order by Ref",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/orders/{{order_ref}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "orders", "{{order_ref}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Accept Order",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/orders/{{order_ref}}/accept",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "orders", "{{order_ref}}", "accept"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Decline Order",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/orders/{{order_ref}}/decline",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "orders", "{{order_ref}}", "decline"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark Order Ready",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/orders/{{order_ref}}/ready",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "orders", "{{order_ref}}", "ready"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Assign Rider",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"riderName\": \"Peter Omondi\",\n  \"riderKind\": \"PLATFORM\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/vendor/orders/{{order_ref}}/assign-rider",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "orders", "{{order_ref}}", "assign-rider"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark Delivered",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/orders/{{order_ref}}/deliver",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "orders", "{{order_ref}}", "deliver"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🧴 Vendor — Products",
+      "description": "Product catalogue and inventory management. All require `ROLE_VENDOR`.",
+      "item": [
+        {
+          "name": "List Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/products",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "products"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Stock",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"delta\": 10\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/vendor/products/{{product_id}}/stock",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "products", "{{product_id}}", "stock"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Price",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": 550\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/vendor/products/{{product_id}}/price",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "products", "{{product_id}}", "price"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Toggle Pause Product",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/products/{{product_id}}/toggle-pause",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "products", "{{product_id}}", "toggle-pause"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📊 Vendor — Analytics",
+      "description": "Sales analytics and performance metrics. Requires `ROLE_VENDOR`.",
+      "item": [
+        {
+          "name": "Get Analytics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/analytics?period=Last 30 days",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "analytics"],
+              "query": [{ "key": "period", "value": "Last 30 days" }]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🧾 Vendor — Offline Sales",
+      "description": "Record and manage offline sales. Requires `ROLE_VENDOR`.",
+      "item": [
+        {
+          "name": "List Offline Sales",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/offline-sales",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "offline-sales"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Offline Sale",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json && json.id) {",
+                  "    pm.collectionVariables.set('sale_id', json.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"saleDate\": \"2026-10-11\",\n  \"product\": \"20L Refill\",\n  \"qty\": 5,\n  \"amount\": 2500,\n  \"channel\": \"Walk-in customer\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/vendor/offline-sales",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "offline-sales"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Offline Sale",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/offline-sales/{{sale_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "offline-sales", "{{sale_id}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "💰 Vendor — Payouts",
+      "description": "Payout summary and history. Requires `ROLE_VENDOR`.",
+      "item": [
+        {
+          "name": "Get Payouts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/payouts",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "payouts"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "✅ Vendor — Verification",
+      "description": "Business profile and verification document management. Requires `ROLE_VENDOR`.",
+      "item": [
+        {
+          "name": "Get Verification Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/verification",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "verification"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Business Profile",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"businessName\": \"Clear Waters Ltd\",\n  \"waterSource\": \"Borehole\",\n  \"treatment\": \"UV + RO + Mineralization\",\n  \"phValue\": \"7.2\",\n  \"tdsValue\": \"120 ppm\",\n  \"about\": \"Premium water supplier in Nairobi since 2015\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/vendor/verification/profile",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "verification", "profile"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "⭐ Vendor — Subscription",
+      "description": "Subscription plan management. Requires `ROLE_VENDOR`.",
+      "item": [
+        {
+          "name": "Get Subscription",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/subscription",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "subscription"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Upgrade to PRO",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/vendor/subscription/upgrade",
+              "host": ["{{base_url}}"],
+              "path": ["api", "vendor", "subscription", "upgrade"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🛠️ Dev Tools",
+      "description": "Development and debugging utilities.",
+      "item": [
+        {
+          "name": "H2 Console",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/h2-console",
+              "host": ["{{base_url}}"],
+              "path": ["h2-console"]
+            },
+            "description": "Opens the H2 in-memory database web console.\n\n⚠️ Open in a **browser** — this is an HTML UI, not a REST endpoint.\n\n**Connection settings:**\n```\nJDBC URL:  jdbc:h2:mem:majipoa\nUsername:  sa\nPassword:  (leave blank)\n```"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
