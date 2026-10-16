@@ -1,3 +1,4 @@
+
 package com.codewithsavage.majipoa.Customer.model;
 
 import com.codewithsavage.majipoa.shared.model.AppUser;
@@ -22,26 +23,38 @@ public class Customer {
     @Id
     @Column(nullable = false, unique = true, updatable = false)
     private String customerId;
+
     @Column(length = 20)
     private String phoneNumber;
+
     private String email;
+
     private String firstName;
+
     private String lastName;
+
     private String userName;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role = Role.CUSTOMER;
+
     /**
-     * The AppUser represents the authenticated platform user.
-     *
-     * Customer represents the customer's business/domain information.
+     * The authenticated platform user associated with this customer.
      */
     @OneToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false, unique = true)
     private AppUser user;
 
-    @OneToOne(cascade = CascadeType.ALL)
-    @JoinColumn(name =  "address_id")
+    /**
+     * Each customer currently has at most one saved address.
+     * Removing the address from the customer also removes its row.
+     */
+    @OneToOne(
+            cascade = CascadeType.ALL,
+            orphanRemoval = true
+    )
+    @JoinColumn(name = "address_id")
     private Address address;
 
     @CreationTimestamp
@@ -56,5 +69,4 @@ public class Customer {
             customerId = "CUSTOMER-" + UUID.randomUUID();
         }
     }
-
 }
