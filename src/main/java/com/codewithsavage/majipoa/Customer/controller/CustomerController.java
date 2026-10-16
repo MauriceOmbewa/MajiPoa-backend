@@ -1,3 +1,4 @@
+
 package com.codewithsavage.majipoa.Customer.controller;
 
 import com.codewithsavage.majipoa.Customer.dto.CustomerRequest;
@@ -19,31 +20,29 @@ public class CustomerController {
 
     private final CustomerService customerService;
 
-    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<CustomerResponse>> getAllCustomers() {
-        return new ResponseEntity<>(customerService.fetchAllCustomers(), HttpStatus.OK);
-
+        return ResponseEntity.ok(customerService.fetchAllCustomers());
     }
 
     /**
-     * Returns the profile of the currently authenticated customer.
+     * Returns the authenticated customer's profile and saved address.
      */
     @GetMapping("/me")
     @PreAuthorize("hasRole('CUSTOMER')")
     public ResponseEntity<CustomerResponse> getMyProfile(
             Authentication authentication) {
 
-        String googleSub = authentication.getName();
-
         CustomerResponse response =
-                customerService.getMyProfile(googleSub);
+                customerService.getMyProfile(authentication.getName());
 
-        return ResponseEntity.ok(
-                customerService.getMyProfile(authentication.getName())
-        );
+        return ResponseEntity.ok(response);
     }
 
+    /**
+     * Updates the authenticated customer's profile and address.
+     */
     @PutMapping("/me")
     @PreAuthorize("hasRole('CUSTOMER')")
     public ResponseEntity<CustomerResponse> updateMyProfile(
@@ -58,19 +57,50 @@ public class CustomerController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * Removes the authenticated customer's saved address.
+     */
+    @DeleteMapping("/me/address")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<Void> deleteMyAddress(
+            Authentication authentication) {
+
+        customerService.deleteMyAddress(authentication.getName());
+
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Administrator-only customer lookup.
+     */
     @GetMapping("/{customerId}")
-    public ResponseEntity<CustomerResponse> getCustomer(@PathVariable String customerId) {
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<CustomerResponse> getCustomer(
+            @PathVariable String customerId) {
+
         return customerService.fetchCustomer(customerId)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    /**
+     * Administrator-only customer update.
+     */
     @PutMapping("/{customerId}")
-    public ResponseEntity<String> updateCustomer(@PathVariable String customerId, @RequestBody CustomerRequest updatedCustomerRequest) {
-        boolean updated = customerService.updateCustomer(customerId, updatedCustomerRequest);
-        if ( updated) {
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<String> updateCustomer(
+            @PathVariable String customerId,
+            @RequestBody CustomerRequest updatedCustomerRequest) {
+
+        boolean updated = customerService.updateCustomer(
+                customerId,
+                updatedCustomerRequest
+        );
+
+        if (updated) {
             return ResponseEntity.ok("Customer updated successfully");
         }
-        return ResponseEntity.notFound().build();
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
     }
 }

@@ -56,7 +56,7 @@ public class OrderService {
                 ))
                 .toList();
         order.setItems(orderItems);
-        Order savedOrder = orderRepository.save(order);
+        Order savedOrder = orderRepository.saveAndFlush(order);
 
         //clear the cart
         cartItemService.clearCart(customerId);
