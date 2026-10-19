@@ -22,7 +22,12 @@ public class Product {
 
     private String name;
     private String description;
+    @Column(precision = 10, scale = 2)
     private BigDecimal price;
+
+    private BigDecimal volumeLitres;
+
+    private String containerType;
     private Integer stockQuantity;
     private String category;
     private String imageUrl;
