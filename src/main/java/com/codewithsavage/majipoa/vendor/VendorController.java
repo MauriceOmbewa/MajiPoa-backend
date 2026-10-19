@@ -1,8 +1,15 @@
 package com.codewithsavage.majipoa.vendor;
 
+import com.codewithsavage.majipoa.shared.dto.LocationRequest;
 import com.codewithsavage.majipoa.shared.model.AppUser;
 import com.codewithsavage.majipoa.shared.repository.UserRepository;
 import com.codewithsavage.majipoa.vendor.dto.*;
+import com.codewithsavage.majipoa.rider.Rider;
+import com.codewithsavage.majipoa.rider.RiderRepository;
+import com.codewithsavage.majipoa.rider.RiderStatus;
+import com.codewithsavage.majipoa.shared.model.VendorOrder;
+import com.codewithsavage.majipoa.shared.model.VendorProfile;
+import com.codewithsavage.majipoa.shared.repository.VendorOrderRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -10,6 +17,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -52,6 +60,8 @@ import java.util.List;
  *   GET    /api/vendor/verification
  *   PUT    /api/vendor/verification/profile
  *
+ *   PUT    /api/vendor/location
+ *
  *   GET    /api/vendor/subscription
  *   POST   /api/vendor/subscription/upgrade
  */
@@ -62,6 +72,8 @@ public class VendorController {
 
     private final VendorService  vendorService;
     private final UserRepository users;
+    private final RiderRepository riderRepository;
+    private final VendorOrderRepository vendorOrderRepository;
 
     private AppUser currentUser(OidcUser principal) {
         return users.findByGoogleSub(principal.getSubject())
@@ -186,6 +198,16 @@ public class VendorController {
         return vendorService.updateProfile(currentUser(principal), body);
     }
 
+    // ── Location ─────────────────────────────────────────────────────────────
+
+    /** Called by the vendor portal after the browser's location permission is granted. */
+    @PutMapping("/location")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void updateLocation(@AuthenticationPrincipal OidcUser principal,
+                               @Valid @RequestBody LocationRequest body) {
+        vendorService.updateLocation(currentUser(principal), body);
+    }
+
     // ── Subscription ─────────────────────────────────────────────────────────
 
     @GetMapping("/subscription")
@@ -196,5 +218,28 @@ public class VendorController {
     @PostMapping("/subscription/upgrade")
     public SubscriptionResponse upgradeToPro(@AuthenticationPrincipal OidcUser principal) {
         return vendorService.upgradeToPro(currentUser(principal));
+    }
+
+    // ── Nearby Riders ─────────────────────────────────────────────────────────
+
+    @GetMapping("/orders/{orderRef}/nearby-riders")
+    public List<RiderSummaryDto> nearbyRiders(@PathVariable String orderRef) {
+        VendorOrder order = vendorOrderRepository.findByOrderRef(orderRef)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderRef));
+        VendorProfile vendor = order.getVendor();
+        Double vLat = vendor.getLatitude();
+        Double vLng = vendor.getLongitude();
+        if (vLat == null || vLng == null) {
+            return List.of();
+        }
+        return riderRepository.findByStatus(RiderStatus.AVAILABLE).stream()
+                .filter(r -> r.getLatitude() != null && r.getLongitude() != null)
+                .map(r -> {
+                    double dist = HaversineUtil.distanceKm(vLat, vLng, r.getLatitude(), r.getLongitude());
+                    return new RiderSummaryDto(r.getId(), r.getFullName(), r.getPhone(), dist);
+                })
+                .filter(dto -> dto.distanceKm() <= 5.0)
+                .sorted(Comparator.comparingDouble(RiderSummaryDto::distanceKm))
+                .toList();
     }
 }

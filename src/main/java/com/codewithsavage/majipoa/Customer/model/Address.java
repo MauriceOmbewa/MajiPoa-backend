@@ -22,4 +22,8 @@ public class Address {
     private String building;
     private String landmark;
     private String pinLocation;
+    
+
+private Double latitude;
+private Double longitude;
 }

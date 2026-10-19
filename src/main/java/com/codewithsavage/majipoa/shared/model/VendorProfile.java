@@ -16,7 +16,9 @@ import java.time.Instant;
  *  - businessName       : displayed in the vendor sidebar and the customer-facing shop
  *  - waterSource / treatment / phValue / tdsValue / about : water quality info shown in the
  *                         customer-facing "Water Passport" for transparency
+ *  - phone / areas / productsDeclared / settlement : application details reviewed by admins
  *  - verificationStatus : set by platform admins after reviewing submitted documents
+ *  - verificationNote   : the admin's latest note to the vendor (shown on their dashboard)
  *  - plan               : FREE or PRO subscription tier
  */
 @Entity
@@ -43,6 +45,27 @@ public class VendorProfile {
     @Column(length = 1000)
     private String about;
 
+    private Double latitude;
+    private Double longitude;
+
+    // ── Application details (new) ─────────────────────────────────────────────
+    private String phone;                       // business contact number
+
+    @Column(length = 500)
+    private String areas;                       // comma separated, e.g. "Rongai, Kiserian, Ongata"
+
+    @Column(length = 500)
+    private String productsDeclared;            // e.g. "20L refill, 10L, 500ml case"
+
+    private String settlement;                  // e.g. "Paybill 4471020"
+
+    // ── Admin review (new) ────────────────────────────────────────────────────
+    @Column(length = 1000)
+    private String verificationNote;            // latest note to the vendor, shown on their dashboard
+
+    private String reviewedBy;
+    private Instant reviewedAt;                 // set when approved or rejected
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private VerificationStatus verificationStatus = VerificationStatus.PENDING;
@@ -53,6 +76,13 @@ public class VendorProfile {
 
     private Instant createdAt = Instant.now();
 
-    public enum VerificationStatus { PENDING, APPROVED, SUSPENDED }
+    /**
+     * PENDING           -> waiting for an admin (shown as "Under review")
+     * APPROVED          -> live on the marketplace
+     * SUSPENDED         -> hidden, reversible
+     * CHANGES_REQUESTED -> sent back to the vendor with a note
+     * REJECTED          -> application declined
+     */
+    public enum VerificationStatus { PENDING, APPROVED, SUSPENDED, CHANGES_REQUESTED, REJECTED }
     public enum SubscriptionPlan   { FREE, PRO }
 }

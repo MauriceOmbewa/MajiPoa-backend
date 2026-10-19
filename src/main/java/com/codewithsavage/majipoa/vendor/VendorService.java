@@ -1,5 +1,6 @@
 package com.codewithsavage.majipoa.vendor;
 
+import com.codewithsavage.majipoa.shared.dto.LocationRequest;
 import com.codewithsavage.majipoa.shared.model.*;
 import com.codewithsavage.majipoa.shared.model.Product.ProductStatus;
 import com.codewithsavage.majipoa.shared.model.VendorOrder.*;
@@ -416,6 +417,16 @@ public class VendorService {
         vendor.setTdsValue(req.tdsValue()); vendor.setAbout(req.about());
         vendorProfiles.save(vendor);
         return getVerification(user);
+    }
+
+    // ── Location ──────────────────────────────────────────────────────────────
+
+    /** Saves the coordinates the browser sent after the vendor allowed location access. */
+    public void updateLocation(AppUser user, LocationRequest req) {
+        VendorProfile vendor = getOrCreateProfile(user);
+        vendor.setLatitude(req.latitude());
+        vendor.setLongitude(req.longitude());
+        vendorProfiles.save(vendor);
     }
 
     // ── Subscription ──────────────────────────────────────────────────────────
