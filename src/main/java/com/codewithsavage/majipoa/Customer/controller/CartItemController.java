@@ -38,7 +38,7 @@ public class CartItemController {
                     .body("Product Out of Stock or User not found or Product not found");
         }
 
-        return ResponseEntity.status(HttpStatus.CREATED).build();
+        return ResponseEntity.status(HttpStatus.CREATED).body("Product added to cart successfully");
     }
 
     @DeleteMapping("/items/{productId}")
