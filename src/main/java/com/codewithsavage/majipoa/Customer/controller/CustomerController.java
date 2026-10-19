@@ -3,7 +3,11 @@ package com.codewithsavage.majipoa.Customer.controller;
 
 import com.codewithsavage.majipoa.Customer.dto.CustomerRequest;
 import com.codewithsavage.majipoa.Customer.dto.CustomerResponse;
+import com.codewithsavage.majipoa.Customer.model.Customer;
 import com.codewithsavage.majipoa.Customer.service.CustomerService;
+import com.codewithsavage.majipoa.shared.dto.LocationRequest;
+
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -58,21 +62,18 @@ public class CustomerController {
     }
 
     /**
-     * Removes the authenticated customer's saved address.
+     * Called by the customer app after the browser's location permission is granted.
      */
-    @DeleteMapping("/me/address")
+    @PutMapping("/location")
     @PreAuthorize("hasRole('CUSTOMER')")
-    public ResponseEntity<Void> deleteMyAddress(
-            Authentication authentication) {
+    public ResponseEntity<Void> updateLocation(
+            Authentication authentication,
+            @Valid @RequestBody LocationRequest request) {
 
-        customerService.deleteMyAddress(authentication.getName());
-
+        customerService.updateLocation(authentication.getName(), request);
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * Administrator-only customer lookup.
-     */
     @GetMapping("/{customerId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<CustomerResponse> getCustomer(
