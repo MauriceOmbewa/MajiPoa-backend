@@ -7,8 +7,10 @@ import com.codewithsavage.majipoa.Customer.dto.CustomerResponse;
 import com.codewithsavage.majipoa.Customer.model.Address;
 import com.codewithsavage.majipoa.Customer.model.Customer;
 import com.codewithsavage.majipoa.Customer.repository.CustomerRepository;
+import com.codewithsavage.majipoa.shared.dto.LocationRequest;
 import com.codewithsavage.majipoa.shared.model.AppUser;
 import com.codewithsavage.majipoa.shared.repository.UserRepository;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -243,5 +245,32 @@ public class CustomerService {
                                 "Customer profile was not found."
                         )
                 );
+    }
+
+    /**
+     * Saves the coordinates the browser sent after the customer allowed location access.
+     * Creates an Address if the customer doesn't have one yet.
+     */
+    @Transactional
+    public void updateLocation(String googleSub, LocationRequest req) {
+
+        AppUser user = userRepository.findByGoogleSub(googleSub)
+                .orElseThrow(() ->
+                        new IllegalStateException("User not found.")
+                );
+
+        Customer customer = customerRepository
+                .findByUserId(user.getId())
+                .orElseGet(() -> createCustomerForUser(user));
+
+        Address address = customer.getAddress();
+        if (address == null) {
+            address = new Address();
+            customer.setAddress(address);   // Customer cascades ALL, so it is saved with the customer
+        }
+        address.setLatitude(req.latitude());
+        address.setLongitude(req.longitude());
+
+        customerRepository.save(customer);
     }
 }

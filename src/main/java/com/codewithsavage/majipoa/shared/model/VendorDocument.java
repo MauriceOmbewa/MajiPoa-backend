@@ -3,6 +3,7 @@ package com.codewithsavage.majipoa.shared.model;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.Instant;
 import java.time.LocalDate;
 
 /**
@@ -18,6 +19,9 @@ import java.time.LocalDate;
  * Platform admins review these and update the status from NOT_SUBMITTED → APPROVED.
  * The overall vendor verificationStatus in VendorProfile is derived from
  * whether all required documents are APPROVED.
+ *
+ * adminNote holds the admin's query / request text for the vendor; it is kept
+ * separate from 'note' so existing vendor-side use of 'note' is unaffected.
  */
 @Entity
 @Table(name = "vendor_documents")
@@ -44,6 +48,13 @@ public class VendorDocument {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private DocStatus status = DocStatus.NOT_SUBMITTED;
+
+    // ── Admin review (new) ────────────────────────────────────────────────────
+    @Column(length = 1000)
+    private String adminNote;
+
+    private String reviewedBy;
+    private Instant reviewedAt;
 
     public enum DocStatus { APPROVED, EXPIRING, NOT_SUBMITTED }
 }

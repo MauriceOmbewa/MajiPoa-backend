@@ -1,5 +1,6 @@
 package com.codewithsavage.majipoa.rider;
 
+import com.codewithsavage.majipoa.shared.model.AppUser;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
@@ -15,11 +16,17 @@ public class Rider {
     @Column(nullable = false)
     private String fullName;
 
-    @Column(nullable = false, unique = true)
+    /** Optional until the rider fills in their profile (unique when present). */
+    @Column(unique = true)
     private String phone;
 
     @Column(unique = true)
     private String email;
+
+    /** The login account this rider profile belongs to. */
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", unique = true)
+    private AppUser user;
 
     private String vehicleType;
 
@@ -33,6 +40,8 @@ public class Rider {
     private String mpesaNumber;
 
     private boolean verified = false;
+
+    private boolean adminSuspended = false;
 
     private boolean notifyNewOrders = true;
     private boolean notifyPayouts = true;
@@ -77,6 +86,9 @@ public class Rider {
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
 
+    public AppUser getUser() { return user; }
+    public void setUser(AppUser user) { this.user = user; }
+
     public String getVehicleType() { return vehicleType; }
     public void setVehicleType(String vehicleType) { this.vehicleType = vehicleType; }
 
@@ -91,6 +103,9 @@ public class Rider {
 
     public boolean isVerified() { return verified; }
     public void setVerified(boolean verified) { this.verified = verified; }
+
+    public boolean isAdminSuspended() { return adminSuspended; }
+    public void setAdminSuspended(boolean adminSuspended) { this.adminSuspended = adminSuspended; }
 
     public boolean isNotifyNewOrders() { return notifyNewOrders; }
     public void setNotifyNewOrders(boolean notifyNewOrders) { this.notifyNewOrders = notifyNewOrders; }
@@ -126,4 +141,5 @@ public class Rider {
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

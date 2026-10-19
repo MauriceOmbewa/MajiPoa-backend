@@ -55,4 +55,30 @@ public interface DeliveryRepository extends JpaRepository<Delivery, Long> {
     int expireOverdue(@Param("expired") DeliveryStatus expired,
                       @Param("offered") DeliveryStatus offered,
                       @Param("now") LocalDateTime now);
+
+    // ---- admin riders page ----
+    long countByRiderIdAndStatusAndDeliveredAtBetween(Long riderId, DeliveryStatus status,
+                                                      LocalDateTime from, LocalDateTime to);
+
+    long countByStatusAndDeliveredAtBetween(DeliveryStatus status, LocalDateTime from, LocalDateTime to);
+
+    long countByStatusAndOnTimeFalseAndDeliveredAtBetween(DeliveryStatus status,
+                                                          LocalDateTime from, LocalDateTime to);
+
+    long countByStatusAndOfferedAtBetween(DeliveryStatus status, LocalDateTime from, LocalDateTime to);
+
+    long countByStatusIn(Collection<DeliveryStatus> statuses);
+
+    List<Delivery> findTop100ByRiderIdAndStatusOrderByDeliveredAtDesc(Long riderId, DeliveryStatus status);
+
+    Optional<Delivery> findFirstByRiderIdAndDropoffAreaIsNotNullOrderByOfferedAtDesc(Long riderId);
+
+    @Query("select avg(d.durationMin) from Delivery d "
+         + "where d.status = :status and d.deliveredAt >= :from and d.deliveredAt < :to")
+    Double averageDurationMinutes(@Param("status") DeliveryStatus status,
+                                  @Param("from") LocalDateTime from,
+                                  @Param("to") LocalDateTime to);
+                                  // ASSUMPTION: Delivery has rider, status (DeliveryStatus) and deliveredAt (LocalDateTime)
+List<Delivery> findByRiderIdAndStatusAndDeliveredAtBetween(
+        Long riderId, DeliveryStatus status, LocalDateTime from, LocalDateTime to);
 }

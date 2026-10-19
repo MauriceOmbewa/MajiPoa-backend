@@ -123,6 +123,7 @@ public final class RiderDtos {
             Long id,
             LocalDate periodStart,
             LocalDate periodEnd,
+            int deliveries,
             BigDecimal amount,
             PayoutStatus status,
             LocalDateTime paidAt,
